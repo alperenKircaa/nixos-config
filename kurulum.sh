@@ -115,48 +115,121 @@ fi
 
 SSH_KEY="$HOME/.ssh/id_ed25519"
 
-if [ ! -f "$SSH_KEY" ]; then
+if [ -f "$SSH_KEY" ]; then
+    # Key zaten var — kullanıcıya bilgi ver
+    KEY_PARMAK=$(ssh-keygen -l -f "$SSH_KEY" 2>/dev/null | awk '{print $2}')
     dialog --backtitle "$BACKTITLE" \
            --title "🔑 SSH Anahtarı [2/8]" \
-           --msgbox "\
-SSH Private Key (~/.ssh/id_ed25519) bulunamadı!
+           --yes-label "Kullan" \
+           --no-label "Değiştir" \
+           --yesno "\
+Mevcut SSH anahtarı bulundu:
 
-Bir sonraki ekranda id_ed25519 (Private Key)
-içeriğini yapıştırman gerekecek.
+  📁 $SSH_KEY
+  🔑 $KEY_PARMAK
 
-Alternatif: Scripti iptal et, key dosyasını
-~/.ssh/id_ed25519 konumuna kopyala, tekrar çalıştır." 13 58
+Bu anahtarı kullanmak istiyor musun?" 12 58
 
-    # Dialog editbox ile key alma
-    TEMP_KEY=$(mktemp)
-    dialog --backtitle "$BACKTITLE" \
-           --title "🔑 SSH Private Key Girişi" \
-           --inputbox "id_ed25519 private key içeriğini yapıştır ve OK'e bas:" \
-           12 70 2>"$TEMP_KEY"
+    if [ $? -ne 0 ]; then
+        # Kullanıcı değiştirmek istiyor — mevcut key'i yedekle
+        mv "$SSH_KEY" "${SSH_KEY}.yedek.$(date +%s)"
+        [ -f "${SSH_KEY}.pub" ] && mv "${SSH_KEY}.pub" "${SSH_KEY}.pub.yedek.$(date +%s)"
+    fi
+fi
 
-    if [ $? -ne 0 ] || [ ! -s "$TEMP_KEY" ]; then
-        rm -f "$TEMP_KEY"
-        hata_ve_cik "SSH anahtarı alınamadı. Kurulum iptal edildi."
+if [ ! -f "$SSH_KEY" ]; then
+    SSH_SECIM=$(dialog --backtitle "$BACKTITLE" \
+                       --title "🔑 SSH Anahtarı [2/8]" \
+                       --menu "\
+SSH Private Key bulunamadı.
+Ne yapmak istersin?" \
+                       14 58 3 \
+                       "olustur" "🆕 Yeni SSH anahtarı oluştur (önerilen)" \
+                       "yapistir" "📋 Var olan key'i yapıştır" \
+                       "iptal"   "❌ Kurulumu iptal et" \
+                       3>&1 1>&2 2>&3)
+
+    if [ $? -ne 0 ] || [ "$SSH_SECIM" = "iptal" ]; then
+        clear
+        echo "Kurulum iptal edildi."
+        exit 0
     fi
 
     mkdir -p ~/.ssh
     chmod 700 ~/.ssh
-    mv "$TEMP_KEY" "$SSH_KEY"
-    chmod 600 "$SSH_KEY"
 
-    # Anahtarın geçerli olup olmadığını kontrol et
-    if ! ssh-keygen -l -f "$SSH_KEY" > /dev/null 2>&1; then
-        rm -f "$SSH_KEY"
-        hata_ve_cik "Geçersiz veya bozuk SSH anahtarı! Kurulum durduruldu."
-    fi
+    case "$SSH_SECIM" in
+        olustur)
+            # E-posta sor (key comment olarak)
+            SSH_EMAIL=$(dialog --backtitle "$BACKTITLE" \
+                               --title "🆕 Yeni SSH Key Oluştur" \
+                               --inputbox "\
+SSH anahtarına eklenecek e-posta adresini gir.
+(Opsiyonel — boş bırakabilirsin)" \
+                               10 55 "${KULLANICI}@nixos" \
+                               3>&1 1>&2 2>&3)
 
-    bilgi_goster "✅ SSH Anahtarı" "Anahtar başarıyla doğrulandı ve kaydedildi."
+            [ $? -ne 0 ] && SSH_EMAIL="${KULLANICI}@nixos"
+            [ -z "$SSH_EMAIL" ] && SSH_EMAIL="${KULLANICI}@nixos"
+
+            # Key oluştur (parola korumasız — kurulum ortamı)
+            ssh-keygen -t ed25519 -C "$SSH_EMAIL" -f "$SSH_KEY" -N "" > /dev/null 2>&1
+
+            if [ ! -f "$SSH_KEY" ]; then
+                hata_ve_cik "SSH anahtarı oluşturulamadı!"
+            fi
+
+            KEY_PARMAK=$(ssh-keygen -l -f "$SSH_KEY" 2>/dev/null | awk '{print $2}')
+            bilgi_goster "✅ SSH Anahtarı Oluşturuldu" "\
+Yeni anahtar başarıyla oluşturuldu!
+
+  📁 $SSH_KEY
+  🔑 $KEY_PARMAK
+  📧 $SSH_EMAIL
+
+⚠️  Kurulum bittikten sonra public key'ini
+GitHub/GitLab'a eklemeyi unutma!"
+            ;;
+
+        yapistir)
+            dialog --backtitle "$BACKTITLE" \
+                   --title "📋 SSH Key Yapıştır" \
+                   --msgbox "\
+Bir sonraki ekranda id_ed25519 (Private Key)
+içeriğini yapıştırman gerekecek.
+
+Alternatif: Scripti iptal et, key dosyasını
+~/.ssh/id_ed25519 konumuna kopyala, tekrar çalıştır." 12 58
+
+            TEMP_KEY=$(mktemp)
+            dialog --backtitle "$BACKTITLE" \
+                   --title "📋 SSH Private Key Girişi" \
+                   --inputbox "id_ed25519 private key içeriğini yapıştır:" \
+                   12 70 2>"$TEMP_KEY"
+
+            if [ $? -ne 0 ] || [ ! -s "$TEMP_KEY" ]; then
+                rm -f "$TEMP_KEY"
+                hata_ve_cik "SSH anahtarı alınamadı. Kurulum iptal edildi."
+            fi
+
+            mv "$TEMP_KEY" "$SSH_KEY"
+            chmod 600 "$SSH_KEY"
+
+            # Doğrulama
+            if ! ssh-keygen -l -f "$SSH_KEY" > /dev/null 2>&1; then
+                rm -f "$SSH_KEY"
+                hata_ve_cik "Geçersiz veya bozuk SSH anahtarı! Kurulum durduruldu."
+            fi
+
+            bilgi_goster "✅ SSH Anahtarı" "Anahtar başarıyla doğrulandı ve kaydedildi."
+            ;;
+    esac
 fi
 
 # SSH Key yetki kontrolü
 chmod 600 "$SSH_KEY"
 
-# Public key'i oluştur (ISO authorized_keys güncellemesi için)
+# Public key'i oluştur/oku
 SSH_PUB_KEY=$(ssh-keygen -y -f "$SSH_KEY" 2>/dev/null)
 if [ -z "$SSH_PUB_KEY" ]; then
     hata_ve_cik "SSH public key oluşturulamadı!"
