@@ -55,6 +55,7 @@ fi
 #  [0/8] HOŞGELDİN EKRANI
 # ============================================================================
 
+HOSGELDIN_CEVAP=0
 dialog --backtitle "$BACKTITLE" \
        --title "🚀 NixOS Kurulum Sihirbazı" \
        --yes-label "Başla" \
@@ -74,9 +75,9 @@ Bu sihirbaz sana aşağıdaki soruları soracak:
 Ardından tüm config dosyaları otomatik
 güncellenecek ve NixOS kurulumu başlayacak.
 
-Devam etmek istiyor musun?" 21 56
+Devam etmek istiyor musun?" 21 56 && HOSGELDIN_CEVAP=0 || HOSGELDIN_CEVAP=$?
 
-if [ $? -ne 0 ]; then
+if [ "$HOSGELDIN_CEVAP" -ne 0 ]; then
     clear
     echo "Kurulum iptal edildi."
     exit 0
@@ -118,6 +119,7 @@ SSH_KEY="$HOME/.ssh/id_ed25519"
 if [ -f "$SSH_KEY" ]; then
     # Key zaten var — kullanıcıya bilgi ver
     KEY_PARMAK=$(ssh-keygen -l -f "$SSH_KEY" 2>/dev/null | awk '{print $2}')
+    SSH_MEVCUT_CEVAP=0
     dialog --backtitle "$BACKTITLE" \
            --title "🔑 SSH Anahtarı [2/8]" \
            --yes-label "Kullan" \
@@ -128,9 +130,9 @@ Mevcut SSH anahtarı bulundu:
   📁 $SSH_KEY
   🔑 $KEY_PARMAK
 
-Bu anahtarı kullanmak istiyor musun?" 12 58
+Bu anahtarı kullanmak istiyor musun?" 12 58 && SSH_MEVCUT_CEVAP=0 || SSH_MEVCUT_CEVAP=$?
 
-    if [ $? -ne 0 ]; then
+    if [ "$SSH_MEVCUT_CEVAP" -ne 0 ]; then
         # Kullanıcı değiştirmek istiyor — mevcut key'i yedekle
         mv "$SSH_KEY" "${SSH_KEY}.yedek.$(date +%s)"
         [ -f "${SSH_KEY}.pub" ] && mv "${SSH_KEY}.pub" "${SSH_KEY}.pub.yedek.$(date +%s)"
@@ -311,6 +313,7 @@ fi
 #  [5/8] LUKS ŞİFRELEME
 # ============================================================================
 
+LUKS_AKTIF=0
 dialog --backtitle "$BACKTITLE" \
        --title "🔒 Disk Şifreleme (LUKS) [5/8]" \
        --yes-label "Evet, Şifrele" \
@@ -327,10 +330,8 @@ LUKS Açık:
 LUKS Kapalı:
   ✓ Doğrudan boot, şifre yok
   ✓ Biraz daha hızlı I/O
-  ✗ Fiziksel erişimde veri korumasız" 18 55
-
-LUKS_AKTIF=$?
-# 0 = Evet, 1 = Hayır
+  ✗ Fiziksel erişimde veri korumasız" 18 55 && LUKS_AKTIF=0 || LUKS_AKTIF=$?
+# LUKS_AKTIF: 0 = Evet (şifrele), 1 = Hayır (şifreleme)
 
 # ============================================================================
 #  [6/8] SWAP BOYUTU
@@ -415,6 +416,7 @@ else
     LUKS_DURUM="❌ KAPALI (şifresiz)"
 fi
 
+OZET_CEVAP=0
 dialog --backtitle "$BACKTITLE" \
        --title "📋 Kurulum Özeti" \
        --yes-label "KUR" \
@@ -433,9 +435,9 @@ Aşağıdaki ayarlarla kurulum yapılacak:
 
 ⚠️  $SECILEN_DISK DİSKİ TAMAMEN SİLİNECEKTİR!
 
-Devam edilsin mi?" 21 55
+Devam edilsin mi?" 21 55 && OZET_CEVAP=0 || OZET_CEVAP=$?
 
-if [ $? -ne 0 ]; then
+if [ "$OZET_CEVAP" -ne 0 ]; then
     clear
     echo "Kurulum iptal edildi."
     exit 0
