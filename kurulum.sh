@@ -256,7 +256,7 @@ while IFS= read -r line; do
         disk_label="$disk_size"
     fi
 
-    DISK_LIST+=("/dev/$disk_name" "$disk_label")
+    DISK_LIST+=("$disk_name" "$disk_label")
 done < <(lsblk -dnpo NAME,SIZE,TYPE,TRAN | grep "disk" | grep -v "loop")
 
 if [ ${#DISK_LIST[@]} -eq 0 ]; then
