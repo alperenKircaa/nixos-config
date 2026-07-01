@@ -1,0 +1,7 @@
+keys:
+  - &user_alperen age15hfrt7897vzvj998auwgxpl2mfpc5mz64rapl7tl8neaq90y4c7suq83xg
+creation_rules:
+  - path_regex: secrets\.yaml$
+    key_groups:
+      - age:
+          - *user_alperen

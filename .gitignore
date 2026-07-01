@@ -1,0 +1,8 @@
+# Nix derleme çıktıları
+result
+result-*
+
+# Geçici dosyalar (Editörlerin oluşturduğu)
+*.swp
+*~
+.direnv/

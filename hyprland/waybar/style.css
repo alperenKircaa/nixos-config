@@ -1,0 +1,209 @@
+/* ============================================
+   Waybar Tema — Glassmorphism Dark
+   Kaynak: ~/nixos-config/hyprland/waybar/style.css
+   ============================================ */
+
+/* ---------- Genel Bar ---------- */
+* {
+    font-family: "JetBrainsMono Nerd Font", "Noto Sans", sans-serif;
+    font-size: 13px;
+    min-height: 0;
+}
+
+window#waybar {
+    background: rgba(21, 22, 30, 0.85);
+    border-radius: 14px;
+    border: 1px solid rgba(100, 114, 125, 0.35);
+    color: #cdd6f4;
+}
+
+window#waybar.hidden {
+    opacity: 0.2;
+}
+
+tooltip {
+    background: rgba(30, 30, 46, 0.95);
+    border: 1px solid rgba(137, 180, 250, 0.45);
+    border-radius: 10px;
+    color: #cdd6f4;
+}
+
+tooltip label {
+    color: #cdd6f4;
+}
+
+/* ---------- Tüm Modüller ---------- */
+#workspaces,
+#window,
+#clock,
+#cpu,
+#memory,
+#pulseaudio,
+#network,
+#battery,
+#bluetooth,
+#tray,
+#custom-power {
+    padding: 0 12px;
+    margin: 4px 2px;
+    border-radius: 10px;
+    background: rgba(49, 50, 68, 0.55);
+    transition: all 0.3s ease;
+}
+
+/* ---------- Workspace ---------- */
+#workspaces button {
+    padding: 0 6px;
+    margin: 2px;
+    color: #6c7086;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    transition: all 0.25s ease;
+}
+
+#workspaces button:hover {
+    background: rgba(137, 180, 250, 0.15);
+    color: #89b4fa;
+}
+
+#workspaces button.active {
+    background: linear-gradient(135deg, #89b4fa, #74c7ec);
+    color: #1e1e2e;
+    font-weight: bold;
+    box-shadow: 0 0 8px rgba(137, 180, 250, 0.45);
+}
+
+#workspaces button.urgent {
+    background: linear-gradient(135deg, #f38ba8, #eba0ac);
+    color: #1e1e2e;
+}
+
+/* ---------- Window Title ---------- */
+#window {
+    color: #a6adc8;
+    font-style: italic;
+}
+
+/* ---------- Clock ---------- */
+#clock {
+    background: linear-gradient(135deg, rgba(137, 180, 250, 0.2), rgba(180, 190, 254, 0.2));
+    color: #89b4fa;
+    font-weight: bold;
+}
+
+#clock:hover {
+    background: linear-gradient(135deg, rgba(137, 180, 250, 0.35), rgba(180, 190, 254, 0.35));
+}
+
+/* ---------- CPU ---------- */
+#cpu {
+    color: #a6e3a1;
+}
+
+#cpu:hover {
+    background: rgba(166, 227, 161, 0.15);
+}
+
+/* ---------- Memory ---------- */
+#memory {
+    color: #cba6f7;
+}
+
+#memory:hover {
+    background: rgba(203, 166, 247, 0.15);
+}
+
+/* ---------- Pulseaudio ---------- */
+#pulseaudio {
+    color: #fab387;
+}
+
+#pulseaudio:hover {
+    background: rgba(250, 179, 135, 0.15);
+}
+
+#pulseaudio.muted {
+    color: #585b70;
+}
+
+/* ---------- Network ---------- */
+#network {
+    color: #89dceb;
+}
+
+#network:hover {
+    background: rgba(137, 220, 235, 0.15);
+}
+
+#network.disconnected {
+    color: #f38ba8;
+}
+
+/* ---------- Bluetooth ---------- */
+#bluetooth {
+    color: #89b4fa;
+}
+
+#bluetooth:hover {
+    background: rgba(137, 180, 250, 0.15);
+}
+
+#bluetooth.disabled,
+#bluetooth.off {
+    color: #585b70;
+}
+
+/* ---------- Battery ---------- */
+#battery {
+    color: #a6e3a1;
+}
+
+#battery.warning {
+    color: #f9e2af;
+}
+
+#battery.critical {
+    color: #f38ba8;
+    animation: blink 1s ease infinite;
+}
+
+#battery.charging,
+#battery.plugged {
+    color: #a6e3a1;
+}
+
+@keyframes blink {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0.3;
+    }
+}
+
+/* ---------- Tray ---------- */
+#tray {
+    color: #cdd6f4;
+}
+
+#tray > .passive {
+    -gtk-icon-effect: dim;
+}
+
+#tray > .needs-attention {
+    -gtk-icon-effect: highlight;
+    background: rgba(243, 139, 168, 0.2);
+}
+
+/* ---------- Power Button ---------- */
+#custom-power {
+    color: #f38ba8;
+    font-size: 16px;
+    padding: 0 10px;
+}
+
+#custom-power:hover {
+    background: rgba(243, 139, 168, 0.25);
+    border-radius: 10px;
+}

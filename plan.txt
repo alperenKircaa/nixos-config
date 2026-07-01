@@ -1,0 +1,214 @@
+===============================================================
+  NixOS Config — Improvement Roadmap
+  Created: 2026-06-21
+===============================================================
+
+This file tracks goals and improvement ideas for ~/nixos-config.
+Items are ordered by impact. Check them off as you go.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 🔴  HIGH PRIORITY — Fix these first
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ [X] 1. Eliminate hardcoded username
+      "alperenkirca" appears literally in 5+ files (flake.nix,
+      home.nix, users.nix, shell aliases, env vars).
+      → Define `username` once in flake.nix via `specialArgs`
+      → Thread it into every module: users.${username}, etc.
+      → Makes the entire config portable and reusable.
+
+[X ] 2. Move SOPS_AGE_KEY_FILE to user scope
+      Currently set via `environment.variables` (system-wide,
+      visible to all users in /etc/environment).
+      → Move to `home.sessionVariables` in Home Manager
+      → Only your user session will see it.
+
+[ ] 3. Re-enable sops validation
+      `validateSopsFiles = false` in secrets-config.nix disables
+      a safety net that catches secrets.yaml misconfigurations
+      at eval time (before you even build).
+      → Set to `true` for the main host config.
+      → The ISO config doesn't import secrets, so it won't break.
+
+[ ] 4. Consolidate boot configuration
+      Boot options are fragmented across 3 files:
+        - configuration.nix  → boot.loader.*
+        - karnel.nix          → boot.kernelPackages
+        - driver.nix          → boot.initrd.kernelModules, boot.kernelModules
+      → Merge all `boot.*` options into a single boot/kernel module.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 🟡  MEDIUM PRIORITY — Architecture improvements
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ ] 5. Isolate school network credentials
+      Both network-home.nix and network-okul.nix are always
+      imported — school WiFi credentials are written to disk
+      even when you're at home.
+      → Move the sops template for Okul-2020 INSIDE the
+        specialisation block so it only exists when activated.
+
+[ ] 6. Split users.nix into focused modules
+      users.nix currently handles: user definition, shell aliases,
+      env vars, Fish shell config, and programs.fish.enable.
+      → modules/users.nix   — only users.users.* definition
+      → modules/shell.nix   — aliases and env vars
+      → home/fish.nix       — Fish config via Home Manager
+        (gives you full programs.fish dotfile management)
+
+[ ] 7. Separate system vs. user packages
+      paketler.nix mixes essential system tools (vim, git) with
+      dev/admin tools (alejandra, nix-tree, sops, ssh-to-age, nh).
+      → Keep system-critical packages in paketler.nix
+      → Move dev tools to home.packages in home.nix
+      → User-scoped packages don't bloat the system profile.
+
+[ ] 8. Pin nix-flatpak to a release tag
+      `?ref=latest` is a floating branch, not a pinned version.
+      `nix flake update` will silently pull whatever latest
+      points to at that moment.
+      → Pin to a specific tag: github:gmodena/nix-flatpak/v0.6.0
+
+[ ] 9. Document why home-manager tracks master
+      `home-manager.url` points to `master` which is correct
+      when nixpkgs tracks `unstable`, but it's not obvious.
+      → Add a comment: "must track master when nixpkgs = unstable"
+
+[X ] 10. Remove dead uutils-coreutils aliases
+       The entire /* ... */ commented block in users.nix (40+ lines)
+       is unnecessary — `uutils-coreutils-noprefix` already puts
+       commands on PATH without the uu- prefix.
+       → Delete the commented block entirely.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 🟢  MINOR — Naming, formatting, polish
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ ] 11. Run `alejandra .` on the whole repo
+       Fixes inconsistent indentation across locals.nix,
+       users.nix, paketler.nix, services.nix (mix of 0-indent
+       and 2-space indent).
+
+[ ] 12. Rename karnel.nix → kernel.nix
+       Turkish spelling will confuse LSP autocomplete (nixd/nil)
+       and other contributors. Update import in configuration.nix.
+
+[ ] 13. Rename DesktopEnvironments.nix → desktop.nix
+       PascalCase is inconsistent with all other lowercase
+       module filenames.
+
+[ ] 14. Clean up empty lines in locals.nix
+       Lines 19-22 are blank — just noise.
+
+[X ] 15. Give the host a real hostname
+       `networking.hostName = "nixos"` is the default.
+       → Use something meaningful: "thinkpad", "alperen-tp", etc.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 💡  FEATURE IDEAS — Nice to have
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ ] 16. Fish shell via Home Manager (home/fish.nix)
+       Full declarative control over fish config, plugins,
+       abbreviations, and prompt — instead of the current
+       2-line interactiveShellInit in users.nix.
+
+[ ] 17. Add Starship prompt
+       `programs.starship.enable = true` in Home Manager.
+       Beautiful, fast, informative shell prompt with git
+       status, nix shell indicator, etc.
+
+[ ] 18. Add direnv + nix-direnv
+       `programs.direnv.enable = true` in Home Manager.
+       Per-project dev environments that activate automatically
+       when you cd into a directory. Essential for development.
+
+[ ] 19. Declarative SSH config (home/ssh.nix)
+       `programs.ssh` in Home Manager to manage known_hosts,
+       host aliases, and key identities declaratively.
+
+[ ] 20. Add a Nix LSP to your editor packages
+       Install `nixd` or `nil` for proper autocompletion and
+       error checking when editing .nix files.
+
+[ ] 21. Automatic flake updates via systemd timer
+       A weekly systemd service that runs `nix flake update`
+       and optionally commits the lockfile change.
+
+[ ] 22. Add a README.md
+       Document the repo structure, how to install from the
+       custom ISO, and what the specialisation does. Future-you
+       will thank present-you.
+
+[ ] 23. Set up CI with GitHub Actions
+       Run `nix flake check` on every push to catch breakages
+       before they hit your machine.
+
+[ ] 24. Add Tailscale service config
+       You have the tailscale package installed but no
+       `services.tailscale.enable = true` — the daemon won't
+       start automatically without it.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 📁  TARGET FILE STRUCTURE (after refactoring)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  nixos-config/
+  ├── flake.nix                  # username defined here via specialArgs
+  ├── flake.lock
+  ├── configuration.nix          # imports only, no inline boot config
+  ├── hardware-configuration.nix
+  ├── home.nix                   # home-manager entry point
+  ├── secrets.yaml               # encrypted by sops
+  ├── .sops.yaml
+  ├── .gitignore
+  ├── README.md                  # NEW — repo documentation
+  ├── plan.txt                   # this file
+  │
+  ├── modules/
+  │   ├── boot.nix               # RENAMED — all boot.* options consolidated
+  │   ├── desktop.nix            # RENAMED from DesktopEnvironments.nix
+  │   ├── disk.nix
+  │   ├── driver.nix             # hardware only, no boot.* options
+  │   ├── locale.nix             # RENAMED from locals.nix
+  │   ├── network.nix
+  │   ├── network-home.nix
+  │   ├── network-okul.nix       # sops template moved inside specialisation
+  │   ├── packages.nix           # RENAMED from paketler.nix (system pkgs only)
+  │   ├── secrets-config.nix
+  │   ├── services.nix
+  │   ├── shell.nix              # NEW — aliases and env vars
+  │   └── users.nix              # user definition only
+  │
+  ├── home/
+  │   ├── git.nix
+  │   ├── flatpak.nix
+ │   ├── fish.nix               # NEW — Fish shell via Home Manager
+  │   ├── ssh.nix                # NEW — declarative SSH config
+  │   ├── packages.nix           # NEW — dev tools (alejandra, nh, etc.)
+  │   └── starship.nix           # NEW — prompt configuration
+  │
+  ├── scripts/                   # RENAMED — cleaner than loose .sh files
+  │   ├── install.sh             # RENAMED from kurulum.sh
+  │   └── post-install.sh        # RENAMED from indirmesonrasi.sh
+  │
+  └── .github/
+      └── workflows/
+          └── check.yml          # NEW — CI with nix flake check
+
+
+===============================================================
+  NOTES
+===============================================================
+
+- Never commit decrypted secrets — secrets.yaml is sops-encrypted
+- Always test changes with `nixos-rebuild build --flake .#nixos`
+  before switching
+- Run `alejandra .` before every commit to keep formatting clean
+- The school network specialisation can be activated with:
+    sudo /run/current-system/specialisation/okul-agi/bin/switch-to-configuration switch
