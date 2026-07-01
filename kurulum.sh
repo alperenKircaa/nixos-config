@@ -4,13 +4,14 @@
 set -e
 
 # ============================================================================
-#  Alperen'in NixOS Otomatik Kurulum Sihirbazı (Dialog TUI)
+#  NixOS Otomatik Kurulum Sihirbazı (Dialog TUI)
 # ============================================================================
-# Bu betik, kullanıcıdan disk tipi, şifreleme tercihi, bölüm boyutları gibi
-# bilgileri interaktif olarak alır ve disk.nix dosyasını dinamik olarak üretir.
+# Bu betik, kullanıcıdan kullanıcı adı, disk tipi, şifreleme tercihi, bölüm
+# boyutları gibi bilgileri interaktif olarak alır ve disk.nix dosyasını
+# dinamik olarak üretir. Herkes kendi ayarlarıyla kullanabilir.
 # ============================================================================
 
-BACKTITLE="Alperen'in NixOS Kurulum Sihirbazı"
+BACKTITLE="NixOS Kurulum Sihirbazı"
 CONFIG_DIR="./modules"
 DISK_NIX="$CONFIG_DIR/disk.nix"
 
@@ -51,7 +52,7 @@ if ! command -v dialog &> /dev/null; then
 fi
 
 # ============================================================================
-#  [0/6] HOŞGELDİN EKRANI
+#  [0/8] HOŞGELDİN EKRANI
 # ============================================================================
 
 dialog --backtitle "$BACKTITLE" \
@@ -59,21 +60,21 @@ dialog --backtitle "$BACKTITLE" \
        --yes-label "Başla" \
        --no-label "Çıkış" \
        --yesno "\
-Alperen'in NixOS Otomatik Kurulum Sihirbazına hoş geldin!
+NixOS Otomatik Kurulum Sihirbazına hoş geldin!
 
 Bu sihirbaz sana aşağıdaki soruları soracak:
 
+  • Kullanıcı adı ve hostname
   • Hangi diske kurulsun?
   • Disk tipi: SSD mi, HDD mi?
   • LUKS disk şifreleme istiyor musun?
   • Swap alanı ne kadar olsun?
   • Boot bölümü boyutu
-  • Bilgisayarın hostname'i
 
-Ardından disk.nix otomatik oluşturulacak ve
-NixOS kurulumu başlayacak.
+Ardından tüm config dosyaları otomatik
+güncellenecek ve NixOS kurulumu başlayacak.
 
-Devam etmek istiyor musun?" 20 56
+Devam etmek istiyor musun?" 21 56
 
 if [ $? -ne 0 ]; then
     clear
@@ -82,25 +83,55 @@ if [ $? -ne 0 ]; then
 fi
 
 # ============================================================================
-#  [1/6] SSH ANAHTARI KONTROLÜ
+#  [1/8] KULLANICI ADI
+# ============================================================================
+
+KULLANICI=$(dialog --backtitle "$BACKTITLE" \
+                   --title "👤 Kullanıcı Adı [1/8]" \
+                   --inputbox "\
+Sisteme giriş yapacak kullanıcı adını gir.
+
+Kurallar:
+  • Küçük harf, rakam ve tire (-) kullanılabilir
+  • Boşluk ve özel karakter kullanılamaz
+  • Örnek: alperen, mehmet, nixuser" \
+                   15 55 "" \
+                   3>&1 1>&2 2>&3)
+
+if [ $? -ne 0 ] || [ -z "$KULLANICI" ]; then
+    clear
+    echo "Kurulum iptal edildi."
+    exit 0
+fi
+
+# Kullanıcı adı validasyonu
+if ! echo "$KULLANICI" | grep -qE '^[a-z][a-z0-9_-]*$'; then
+    hata_ve_cik "Geçersiz kullanıcı adı: '$KULLANICI'\n\nKüçük harfle başlamalı, sadece küçük harf,\nrakam, tire (-) ve alt çizgi (_) içerebilir."
+fi
+
+# ============================================================================
+#  [2/8] SSH ANAHTARI
 # ============================================================================
 
 SSH_KEY="$HOME/.ssh/id_ed25519"
 
 if [ ! -f "$SSH_KEY" ]; then
     dialog --backtitle "$BACKTITLE" \
-           --title "🔑 SSH Anahtarı Gerekli" \
+           --title "🔑 SSH Anahtarı [2/8]" \
            --msgbox "\
 SSH Private Key (~/.ssh/id_ed25519) bulunamadı!
 
 Bir sonraki ekranda id_ed25519 (Private Key)
-içeriğini yapıştırman gerekecek." 10 55
+içeriğini yapıştırman gerekecek.
+
+Alternatif: Scripti iptal et, key dosyasını
+~/.ssh/id_ed25519 konumuna kopyala, tekrar çalıştır." 13 58
 
     # Dialog editbox ile key alma
     TEMP_KEY=$(mktemp)
     dialog --backtitle "$BACKTITLE" \
            --title "🔑 SSH Private Key Girişi" \
-           --inputbox "id_ed25519 private key içeriğini yapıştır ve OK'e bas.\n(Alternatif: Bu ekranı iptal et, key'i manuel kopyala, scripti tekrar çalıştır)" \
+           --inputbox "id_ed25519 private key içeriğini yapıştır ve OK'e bas:" \
            12 70 2>"$TEMP_KEY"
 
     if [ $? -ne 0 ] || [ ! -s "$TEMP_KEY" ]; then
@@ -125,8 +156,14 @@ fi
 # SSH Key yetki kontrolü
 chmod 600 "$SSH_KEY"
 
+# Public key'i oluştur (ISO authorized_keys güncellemesi için)
+SSH_PUB_KEY=$(ssh-keygen -y -f "$SSH_KEY" 2>/dev/null)
+if [ -z "$SSH_PUB_KEY" ]; then
+    hata_ve_cik "SSH public key oluşturulamadı!"
+fi
+
 # ============================================================================
-#  [2/6] DİSK SEÇİMİ
+#  [3/8] DİSK SEÇİMİ
 # ============================================================================
 
 # Mevcut diskleri listele (sadece disk tipindekiler, partition değil)
@@ -152,7 +189,7 @@ if [ ${#DISK_LIST[@]} -eq 0 ]; then
 fi
 
 SECILEN_DISK=$(dialog --backtitle "$BACKTITLE" \
-                      --title "💾 Disk Seçimi [1/6]" \
+                      --title "💾 Disk Seçimi [3/8]" \
                       --menu "\nKurulum yapılacak diski seç:\n\n⚠️  SEÇİLEN DİSK TAMAMEN SİLİNECEKTİR!" \
                       18 60 6 \
                       "${DISK_LIST[@]}" \
@@ -165,17 +202,12 @@ if [ $? -ne 0 ]; then
 fi
 
 # ============================================================================
-#  [3/6] DİSK TİPİ (SSD / HDD)
+#  [4/8] DİSK TİPİ (SSD / HDD)
 # ============================================================================
 
 # Otomatik tespit dene (rotational = 0 ise SSD)
 DISK_BASENAME=$(basename "$SECILEN_DISK")
-# NVMe diskler için parent device adını al
-if [[ "$DISK_BASENAME" == nvme* ]]; then
-    ROTATIONAL_PATH="/sys/block/$DISK_BASENAME/queue/rotational"
-else
-    ROTATIONAL_PATH="/sys/block/$DISK_BASENAME/queue/rotational"
-fi
+ROTATIONAL_PATH="/sys/block/$DISK_BASENAME/queue/rotational"
 
 OTOMATIK_TIP="Bilinmiyor"
 if [ -f "$ROTATIONAL_PATH" ]; then
@@ -188,7 +220,7 @@ if [ -f "$ROTATIONAL_PATH" ]; then
 fi
 
 DISK_TIPI=$(dialog --backtitle "$BACKTITLE" \
-                   --title "⚡ Disk Tipi [2/6]" \
+                   --title "⚡ Disk Tipi [4/8]" \
                    --default-item "$OTOMATIK_TIP" \
                    --menu "\nDisk tipi nedir?\n\nOtomatik tespit: $OTOMATIK_TIP\n\nSSD → TRIM, discard=async aktif\nHDD → autodefrag aktif" \
                    16 55 3 \
@@ -203,11 +235,11 @@ if [ $? -ne 0 ]; then
 fi
 
 # ============================================================================
-#  [4/6] LUKS ŞİFRELEME
+#  [5/8] LUKS ŞİFRELEME
 # ============================================================================
 
 dialog --backtitle "$BACKTITLE" \
-       --title "🔒 Disk Şifreleme (LUKS) [3/6]" \
+       --title "🔒 Disk Şifreleme (LUKS) [5/8]" \
        --yes-label "Evet, Şifrele" \
        --no-label "Hayır" \
        --yesno "\
@@ -228,14 +260,14 @@ LUKS_AKTIF=$?
 # 0 = Evet, 1 = Hayır
 
 # ============================================================================
-#  [5/6] SWAP BOYUTU
+#  [6/8] SWAP BOYUTU
 # ============================================================================
 
 RAM_GB=$(ram_miktari_gb)
 ONERILEN_SWAP="${RAM_GB}G"
 
 SWAP_SECIM=$(dialog --backtitle "$BACKTITLE" \
-                    --title "💤 Swap Boyutu [4/6]" \
+                    --title "💤 Swap Boyutu [6/8]" \
                     --default-item "auto" \
                     --menu "\nSwap alanı ne kadar olsun?\n\nSisteminde $RAM_GB GB RAM tespit edildi.\nÖnerilen: ${ONERILEN_SWAP} (RAM kadar)" \
                     16 55 4 \
@@ -268,11 +300,11 @@ case "$SWAP_SECIM" in
 esac
 
 # ============================================================================
-#  [5.5/6] BOOT BÖLÜMÜ BOYUTU
+#  [7/8] BOOT BÖLÜMÜ BOYUTU
 # ============================================================================
 
 BOOT_BOYUT=$(dialog --backtitle "$BACKTITLE" \
-                    --title "🥾 Boot Bölümü [5/6]" \
+                    --title "🥾 Boot Bölümü [7/8]" \
                     --default-item "512M" \
                     --menu "\nEFI boot bölümü boyutu:" \
                     12 50 3 \
@@ -287,11 +319,11 @@ if [ $? -ne 0 ]; then
 fi
 
 # ============================================================================
-#  [6/6] HOSTNAME
+#  [8/8] HOSTNAME
 # ============================================================================
 
 HOSTNAME=$(dialog --backtitle "$BACKTITLE" \
-                  --title "🏷️  Hostname [6/6]" \
+                  --title "🏷️  Hostname [8/8]" \
                   --inputbox "\nBilgisayarın ağdaki adı ne olsun?" \
                   9 50 "thinkpad" \
                   3>&1 1>&2 2>&3)
@@ -317,17 +349,18 @@ dialog --backtitle "$BACKTITLE" \
        --yesno "\
 Aşağıdaki ayarlarla kurulum yapılacak:
 
+  Kullanıcı:   $KULLANICI
+  Hostname:    $HOSTNAME
   Disk:        $SECILEN_DISK
   Disk Tipi:   $DISK_TIPI
   Şifreleme:   $LUKS_DURUM
   Swap:        $SWAP_BOYUT
   Boot:        $BOOT_BOYUT
-  Hostname:    $HOSTNAME
   Dosya Sist.: BTRFS (zstd sıkıştırma)
 
 ⚠️  $SECILEN_DISK DİSKİ TAMAMEN SİLİNECEKTİR!
 
-Devam edilsin mi?" 20 55
+Devam edilsin mi?" 21 55
 
 if [ $? -ne 0 ]; then
     clear
@@ -336,14 +369,17 @@ if [ $? -ne 0 ]; then
 fi
 
 # ============================================================================
-#  disk.nix ÜRET
+#  KONFIGÜRASYON DOSYALARINI GÜNCELLE
 # ============================================================================
 
 clear
 echo ""
 echo "======================================================="
-echo "[1/5] disk.nix oluşturuluyor..."
+echo "[1/6] Konfigürasyon dosyaları güncelleniyor..."
 echo "======================================================="
+
+# --- disk.nix üret ---
+echo "  → disk.nix oluşturuluyor..."
 
 # Mount seçeneklerini belirle
 if [ "$DISK_TIPI" = "SSD" ]; then
@@ -362,6 +398,7 @@ if [ "$LUKS_AKTIF" -eq 0 ]; then
 # Disk Yapılandırması (Disko) — Otomatik Üretildi
 # =============================================================================
 # Üretim Tarihi: $(date '+%Y-%m-%d %H:%M')
+# Kullanıcı: $KULLANICI | Hostname: $HOSTNAME
 # Disk: $SECILEN_DISK ($DISK_TIPI)
 # Şifreleme: LUKS
 # Swap: $SWAP_BOYUT | Boot: $BOOT_BOYUT
@@ -433,6 +470,7 @@ else
 # Disk Yapılandırması (Disko) — Otomatik Üretildi
 # =============================================================================
 # Üretim Tarihi: $(date '+%Y-%m-%d %H:%M')
+# Kullanıcı: $KULLANICI | Hostname: $HOSTNAME
 # Disk: $SECILEN_DISK ($DISK_TIPI)
 # Şifreleme: Yok
 # Swap: $SWAP_BOYUT | Boot: $BOOT_BOYUT
@@ -493,90 +531,117 @@ else
 NIXEOF
 fi
 
-echo "✅ disk.nix oluşturuldu: $DISK_NIX"
-echo ""
+echo "  ✅ disk.nix oluşturuldu"
 
-# Hostname'i network.nix'e yaz
-echo "======================================================="
-echo "    Hostname güncelleniyor: $HOSTNAME"
-echo "======================================================="
+# --- flake.nix: username güncelle ---
+echo "  → flake.nix güncelleniyor (username = \"$KULLANICI\")..."
+sed -i "s/username = \".*\"/username = \"$KULLANICI\"/" ./flake.nix
+echo "  ✅ flake.nix güncellendi"
+
+# --- network.nix: hostname güncelle ---
+echo "  → network.nix güncelleniyor (hostname = \"$HOSTNAME\")..."
 sed -i "s/networking.hostName = \".*\"/networking.hostName = \"$HOSTNAME\"/" "$CONFIG_DIR/network.nix"
-echo "✅ Hostname güncellendi."
-echo ""
+echo "  ✅ network.nix güncellendi"
 
-# SSD ise fstrim'i kontrol et, HDD ise kapat
-if [ "$DISK_TIPI" = "HDD" ]; then
-    echo "ℹ️  HDD tespit edildi — fstrim gerekli değil."
-fi
-
-# ============================================================================
-#  [2/5] Disko ile disk bölümleme
-# ============================================================================
+# --- flake.nix: nixosConfigurations adını hostname ile eşleştir ---
+# "thinkpad" olan config adını hostname'le değiştir
+echo "  → flake.nix config adı güncelleniyor ($HOSTNAME)..."
+sed -i "s/^      thinkpad = nixpkgs/      $HOSTNAME = nixpkgs/" ./flake.nix
+echo "  ✅ Config adı güncellendi"
 
 echo ""
-echo "======================================================="
-echo "[2/5] Disko ile diskler bölümleniyor..."
-echo "======================================================="
-sudo nix --experimental-features 'nix-command flakes' run github:nix-community/disko -- --mode disko --flake .#thinkpad
+echo "✅ Tüm konfigürasyon dosyaları güncellendi."
+echo ""
 
 # ============================================================================
-#  [3/5] SSH Anahtarlarını kopyala
+#  [2/6] Disko ile disk bölümleme
 # ============================================================================
 
 echo ""
 echo "======================================================="
-echo "[3/5] SSH Anahtarları yeni sisteme kopyalanıyor..."
+echo "[2/6] Disko ile diskler bölümleniyor..."
+echo "======================================================="
+sudo nix --experimental-features 'nix-command flakes' run github:nix-community/disko -- --mode disko --flake ".#$HOSTNAME"
+
+# ============================================================================
+#  [3/6] SSH Anahtarlarını kopyala
+# ============================================================================
+
+echo ""
+echo "======================================================="
+echo "[3/6] SSH Anahtarları yeni sisteme kopyalanıyor..."
 echo "======================================================="
 # Kullanıcı klasörü ve SSH klasörlerini oluştur
-sudo mkdir -p /mnt/home/alperenkirca/.ssh
+sudo mkdir -p "/mnt/home/$KULLANICI/.ssh"
 sudo mkdir -p /mnt/etc/ssh
 
 # Private Key'i kullanıcı klasörüne kopyala
-sudo cp "$SSH_KEY" /mnt/home/alperenkirca/.ssh/id_ed25519
-sudo chmod 600 /mnt/home/alperenkirca/.ssh/id_ed25519
+sudo cp "$SSH_KEY" "/mnt/home/$KULLANICI/.ssh/id_ed25519"
+sudo chmod 600 "/mnt/home/$KULLANICI/.ssh/id_ed25519"
 
 # Public Key'i oluştur
-ssh-keygen -y -f "$SSH_KEY" | sudo tee /mnt/home/alperenkirca/.ssh/id_ed25519.pub > /dev/null
-sudo chmod 644 /mnt/home/alperenkirca/.ssh/id_ed25519.pub
+echo "$SSH_PUB_KEY" | sudo tee "/mnt/home/$KULLANICI/.ssh/id_ed25519.pub" > /dev/null
+sudo chmod 644 "/mnt/home/$KULLANICI/.ssh/id_ed25519.pub"
 
 # Aynı key'i sistem (Host) key'i olarak kopyala (sops-nix için)
 sudo cp "$SSH_KEY" /mnt/etc/ssh/ssh_host_ed25519_key
 sudo chmod 600 /mnt/etc/ssh/ssh_host_ed25519_key
-ssh-keygen -y -f "$SSH_KEY" | sudo tee /mnt/etc/ssh/ssh_host_ed25519_key.pub > /dev/null
+echo "$SSH_PUB_KEY" | sudo tee /mnt/etc/ssh/ssh_host_ed25519_key.pub > /dev/null
 sudo chmod 644 /mnt/etc/ssh/ssh_host_ed25519_key.pub
 
 # ============================================================================
-#  [4/5] NixOS Kurulumu
+#  [4/6] NixOS Kurulumu
 # ============================================================================
 
 echo ""
 echo "======================================================="
-echo "[4/5] NixOS sistemi kuruluyor..."
+echo "[4/6] NixOS sistemi kuruluyor..."
 echo "======================================================="
-sudo env NIX_CONFIG="experimental-features = nix-command flakes" nixos-install --flake .#thinkpad
+sudo env NIX_CONFIG="experimental-features = nix-command flakes" nixos-install --flake ".#$HOSTNAME"
 
 # ============================================================================
-#  [5/5] Konfigürasyon dosyalarını kopyala
+#  [5/6] Konfigürasyon dosyalarını kopyala
 # ============================================================================
 
 echo ""
 echo "======================================================="
-echo "[5/5] Konfigürasyon dosyaları ~/nixos-config'e kopyalanıyor..."
+echo "[5/6] Konfigürasyon dosyaları ~/nixos-config'e kopyalanıyor..."
 echo "======================================================="
-sudo mkdir -p /mnt/home/alperenkirca/nixos-config
-sudo cp -r . /mnt/home/alperenkirca/nixos-config
-# Yetkileri kullanıcıya ver
-sudo chown -R 1000:100 /mnt/home/alperenkirca/nixos-config
-sudo chown -R 1000:100 /mnt/home/alperenkirca/.ssh
+sudo mkdir -p "/mnt/home/$KULLANICI/nixos-config"
+sudo cp -r . "/mnt/home/$KULLANICI/nixos-config"
+
+# ============================================================================
+#  [6/6] Dosya sahipliğini ayarla
+# ============================================================================
+
+echo ""
+echo "======================================================="
+echo "[6/6] Dosya yetkileri ayarlanıyor..."
+echo "======================================================="
+# nixos-install kullanıcıyı oluşturduğunda UID otomatik atanır.
+# /etc/passwd'den gerçek UID/GID'yi oku (1000 varsaymak yerine)
+if [ -f /mnt/etc/passwd ]; then
+    USER_UID=$(grep "^${KULLANICI}:" /mnt/etc/passwd | cut -d: -f3)
+    USER_GID=$(grep "^${KULLANICI}:" /mnt/etc/passwd | cut -d: -f4)
+fi
+
+# Eğer passwd'den okunamadıysa varsayılan değerleri kullan
+USER_UID="${USER_UID:-1000}"
+USER_GID="${USER_GID:-100}"
+
+sudo chown -R "$USER_UID:$USER_GID" "/mnt/home/$KULLANICI/nixos-config"
+sudo chown -R "$USER_UID:$USER_GID" "/mnt/home/$KULLANICI/.ssh"
+echo "  ✅ Yetkiler ayarlandı (UID:$USER_UID GID:$USER_GID)"
 
 echo ""
 echo "======================================================="
 echo " KURULUM BAŞARIYLA TAMAMLANDI! 🎉"
 echo "======================================================="
-echo "  Disk:      $SECILEN_DISK ($DISK_TIPI)"
-echo "  Şifreleme: $LUKS_DURUM"
-echo "  Swap:      $SWAP_BOYUT"
-echo "  Hostname:  $HOSTNAME"
+echo "  Kullanıcı:   $KULLANICI"
+echo "  Hostname:    $HOSTNAME"
+echo "  Disk:        $SECILEN_DISK ($DISK_TIPI)"
+echo "  Şifreleme:   $LUKS_DURUM"
+echo "  Swap:        $SWAP_BOYUT"
 echo "-------------------------------------------------------"
 echo "1. Sistemi yeniden başlat: reboot"
 echo "2. Yeni sistemde ~/nixos-config klasörüne gir."

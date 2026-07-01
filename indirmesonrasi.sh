@@ -21,7 +21,37 @@ else
     exit 1
 fi
 
-# 3. NH Switch (Opsiyonel - Eğer her şey hazırsa)
+# 3. SOPS Yapılandırmasını Güncelle (.sops.yaml)
+echo ""
+echo "🔑 .sops.yaml güncelleniyor..."
+AGE_PUB_KEY=$(ssh-to-age -i ~/.ssh/id_ed25519.pub 2>/dev/null)
+
+if [ -n "$AGE_PUB_KEY" ]; then
+    KULLANICI=$(whoami)
+    cat > ~/nixos-config/.sops.yaml << EOF
+keys:
+  - &user_${KULLANICI} ${AGE_PUB_KEY}
+creation_rules:
+  - path_regex: secrets\\.yaml\$
+    key_groups:
+      - age:
+          - *user_${KULLANICI}
+EOF
+    echo "✅ .sops.yaml güncellendi (key: ${AGE_PUB_KEY:0:20}...)"
+
+    # secrets.yaml yeniden şifrelemesi gerekiyorsa bilgilendir
+    echo ""
+    echo "⚠️  ÖNEMLİ: Eğer secrets.yaml'daki şifreleri kullanacaksan,"
+    echo "   bu dosyayı kendi key'inle yeniden şifrelemelisin:"
+    echo ""
+    echo "   cd ~/nixos-config"
+    echo "   sops updatekeys secrets.yaml"
+    echo ""
+else
+    echo "⚠️  Age public key oluşturulamadı. .sops.yaml manuel güncellenmeli."
+fi
+
+# 4. NH Switch (Opsiyonel - Eğer her şey hazırsa)
 echo ""
 echo "Sistemi son haline getirmek için 'nh os switch' çalıştırmak ister misin?"
 read -p "(e/H): " switch_onay

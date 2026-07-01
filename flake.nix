@@ -95,10 +95,17 @@
             # ===================================================================
             # SSH YETKİLENDİRME (ISO'ya Güvenli Giriş)
             # ===================================================================
+            # Bu key sadece ISO'dan (Live USB) SSH ile bağlanmak içindir.
+            # Başka biri bu config'i kullanacaksa KENDİ public key'ini buraya
+            # koymalı, veya aşağıdaki parola ile giriş seçeneğini kullanabilir.
+            # ===================================================================
             users.users.nixos.openssh.authorizedKeys.keys = [
               "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDjw9rWE+EPml0yKV13+8jL7GPpb7ZP0dtsaaQR84wH4 alpkirca@proton.me"
             ];
-            services.openssh.enable = true;
+            services.openssh = {
+              enable = true;
+              settings.PasswordAuthentication = true; # ISO'da parola ile de girilebilsin
+            };
           })
         ];
       };
