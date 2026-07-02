@@ -4,8 +4,7 @@
   ...
 }: {
   nixpkgs.config.allowUnfree = true;
-
-  environment.systemPackages = with pkgs; [
+ environment.systemPackages = with pkgs; [
 vim
     git
     proton-pass
@@ -62,5 +61,11 @@ protonmail-desktop
 anyrun 
     desktop-file-utils # Dolphin "Open With" menüsü için MIME cache oluşturur
 vlc
+mullvad-browser
+aichat
+nmap 
+unixtools.ifconfig
+#open-interpreter
+opencode
 ];
 }
